@@ -85,6 +85,18 @@ class LiveServerTest extends TestCase
         $this->assertEqualsWithDelta(1.0, $ipa / $words, 0.4);
     }
 
+    public function test_ipa_with_alternatives_and_dictionary_engine(): void
+    {
+        $either = Tts::ipa('either', 'en-GB');
+        $this->assertSame('/ˈaɪ.ðə/', $either->cambridge());
+        $this->assertContains('/ˈiː.ðə/', array_column($either->alternatives(), 'cambridge'));
+
+        $text = Tts::ipa('The vegetable recipe. Is it good?', 'en-US', 'dictionary');
+        $this->assertCount(2, $text->sentences);
+        $this->assertStringContainsString('ˈvedʒ.tə.bəl', $text->cambridge());
+        $this->assertSame('cmudict', $text->words()[1]['source']);
+    }
+
     public function test_server_errors_map_to_exceptions(): void
     {
         try {

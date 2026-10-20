@@ -102,6 +102,67 @@ class TtsClientTest extends TestCase
         $this->assertSame('1', $query['sentence_silence']);
     }
 
+    public function test_ipa_posts_text_language_and_engine(): void
+    {
+        Http::fake(['tts.test/api/tts/ipa' => Http::response([
+            'language' => 'en-GB',
+            'engine' => 'espeak',
+            'dictionary' => 'britfone',
+            'sentences' => [[
+                'text' => 'either',
+                'ipa' => 'ˈaɪðɐ',
+                'cambridge' => '/ˈaɪ.ðə/',
+                'alternatives' => [['ipa' => 'ˈaɪðə', 'cambridge' => '/ˈaɪ.ðə/'], ['ipa' => 'ˈiːðə', 'cambridge' => '/ˈiː.ðə/']],
+            ]],
+        ])]);
+
+        $ipa = Tts::ipa('either', 'en-GB');
+
+        $this->assertSame('/ˈaɪ.ðə/', $ipa->cambridge());
+        $this->assertSame('ˈaɪðɐ', $ipa->ipa());
+        $this->assertSame(['/ˈaɪ.ðə/', '/ˈiː.ðə/'], array_column($ipa->alternatives(), 'cambridge'));
+        $this->assertSame('britfone', $ipa->dictionary);
+
+        Http::assertSent(function (Request $request) {
+            $this->assertSignedToken(substr($request->header('Authorization')[0], 7));
+
+            return $request->data() === ['text' => 'either', 'language' => 'en-GB', 'engine' => 'espeak'];
+        });
+    }
+
+    public function test_ipa_defaults_and_dictionary_words(): void
+    {
+        config(['tts.ipa_language' => 'en-US']);
+        Http::fake(['*' => Http::response([
+            'language' => 'en-US',
+            'engine' => 'dictionary',
+            'dictionary' => 'cmudict',
+            'sentences' => [
+                ['text' => 'Hi.', 'ipa' => 'hˈaɪ.', 'cambridge' => '/haɪ/', 'words' => [['word' => 'Hi', 'source' => 'cmudict', 'pronunciations' => [['ipa' => 'hˈaɪ', 'cambridge' => '/haɪ/']]]]],
+                ['text' => 'Xyzzy.', 'ipa' => 'zˈɪzi.', 'cambridge' => '/ˈzɪz.i/', 'words' => [['word' => 'Xyzzy', 'source' => 'espeak', 'pronunciations' => [['ipa' => 'zˈɪzi', 'cambridge' => '/ˈzɪz.i/']]]]],
+            ],
+        ])]);
+
+        $ipa = Tts::ipa('Hi. Xyzzy.', engine: 'dictionary');
+
+        $this->assertSame('/haɪ/ /ˈzɪz.i/', $ipa->cambridge());
+        $this->assertSame(['cmudict', 'espeak'], array_column($ipa->words(), 'source'));
+        $this->assertSame([], $ipa->alternatives());
+        Http::assertSent(fn (Request $request) => $request['language'] === 'en-US' && $request['engine'] === 'dictionary');
+    }
+
+    public function test_ipa_validation_errors(): void
+    {
+        Http::fake(['*' => Http::response(['message' => 'Invalid.', 'errors' => ['engine' => ['No pronunciation dictionary for vi-VN.']]], 422)]);
+
+        try {
+            Tts::ipa('Xin chào', 'vi-VN', 'dictionary');
+            $this->fail('expected a validation error');
+        } catch (TtsValidationException $e) {
+            $this->assertArrayHasKey('engine', $e->errors());
+        }
+    }
+
     public function test_maps_error_responses_to_exceptions(): void
     {
         $cases = [

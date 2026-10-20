@@ -104,6 +104,20 @@ class TtsClient
     }
 
     /**
+     * IPA of a word, a sentence or several (POST /api/tts/ipa).
+     *
+     * @param  ?string  $language  en-GB, en-US or vi-VN; null takes config('tts.ipa_language')
+     * @param  'espeak'|'dictionary'  $engine  espeak: what the voices say; dictionary:
+     *                                         CMUdict / Britfone per word (English only)
+     */
+    public function ipa(string $text, ?string $language = null, string $engine = 'espeak'): Ipa
+    {
+        $params = ['text' => $text, 'language' => $language ?? $this->config['ipa_language'] ?? 'en-US', 'engine' => $engine];
+
+        return Ipa::fromResponse($this->send(fn () => $this->request()->post('/api/tts/ipa', $params))->json());
+    }
+
+    /**
      * A temporary token to hand to a browser or app, which then calls the
      * server itself with `Authorization: Bearer <token>`.
      */

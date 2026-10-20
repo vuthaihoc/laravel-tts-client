@@ -27,6 +27,9 @@ return [
     'noise_scale' => is_numeric(env('TTS_NOISE_SCALE')) ? (float) env('TTS_NOISE_SCALE') : null,
     'noise_w' => is_numeric(env('TTS_NOISE_W')) ? (float) env('TTS_NOISE_W') : null,
 
+    // Language of Tts::ipa() when none is given: en-GB, en-US or vi-VN.
+    'ipa_language' => env('TTS_IPA_LANGUAGE', 'en-US'),
+
     // Seconds; long texts can take a while to synthesize.
     'timeout' => (int) env('TTS_TIMEOUT', 120),
 

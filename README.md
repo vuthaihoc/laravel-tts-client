@@ -73,7 +73,27 @@ Tts::synthesize('I like [[təmˈɑːtəʊ]] sauce.', voice: 'en_US-amy-medium');
 Tts::synthesize('Chào mừng quý khách đến [[tˈe-2ɲ fˈoɜ]] Hồ Chí Minh.');
 ```
 
-Ký hiệu phải theo đúng quy ước của espeak-ng cho voice đó. Lấy IPA mẫu trên server bằng `php artisan piper:ipa "thành phố" --voice=...`. Cần server có libpiper build từ `scripts/build-libpiper.sh` (image Docker đã có sẵn), xem [docs của server](https://vuthaihoc.github.io/laravel-tts-api/api/#nhập-ipa).
+Ký hiệu phải theo đúng quy ước của espeak-ng cho voice đó. Lấy IPA mẫu trên server bằng `php artisan piper:ipa "thành phố" --voice=...`. Cần server có libpiper build từ `scripts/build-libpiper.sh` (image Docker đã có sẵn), xem [docs/api.md của server](https://github.com/vuthaihoc/laravel-tts-api/blob/master/docs/api.md#nhập-ipa).
+
+### Lấy phiên âm (IPA)
+
+`Tts::ipa()` gọi `/api/tts/ipa`: đưa vào một từ, một câu hoặc nhiều câu, nhận lại IPA theo từng câu.
+
+```php
+$ipa = Tts::ipa('either', 'en-GB');
+$ipa->cambridge();                                // "/ˈaɪ.ðə/"
+array_column($ipa->alternatives(), 'cambridge');  // ["/ˈaɪ.ðə/", "/ˈiː.ðə/"] (chỉ có với từ lẻ)
+$ipa->ipa();                                      // "ˈaɪðɐ", dán được vào [[ ]]
+
+$ipa = Tts::ipa('The vegetable recipe.', 'en-US', engine: 'dictionary');
+$ipa->cambridge();                                // "/ðə ˈvedʒ.tə.bəl ˈres.ə.pi/"
+$ipa->words();                                    // từng từ: nguồn (cmudict/britfone/espeak) và mọi cách đọc
+$ipa->sentences;                                  // dữ liệu gốc theo từng câu
+```
+
+- `language`: `en-GB`, `en-US` hoặc `vi-VN`. Để trống thì lấy `TTS_IPA_LANGUAGE` (mặc định `en-US`).
+- `engine: 'espeak'` (mặc định) cho IPA đúng như voice sẽ đọc. `engine: 'dictionary'` tra từng từ trong CMUdict (Anh-Mỹ) hoặc Britfone (Anh-Anh), từ nào không có thì dùng espeak; chỉ dùng được với tiếng Anh, `vi-VN` sẽ ném `TtsValidationException`.
+- Bản ghi kiểu Cambridge (`cambridge()`) là `null` với tiếng Việt.
 
 ### Stream
 
