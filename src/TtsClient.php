@@ -46,10 +46,16 @@ class TtsClient
 
     /**
      * Synthesize the whole text into one WAV file.
+     *
+     * Audio options left null take config('tts.*'), or the server's default
+     * when that is not set either: normalize each sentence to full scale,
+     * volume multiplier, seconds of silence between sentences, and the
+     * model's noise_scale / noise_w (0 = no sampling noise, deterministic).
      */
-    public function synthesize(string $text, ?string $voice = null, string|int|null $speaker = null, ?float $speed = null): Audio
+    public function synthesize(string $text, ?string $voice = null, string|int|null $speaker = null, ?float $speed = null, ?bool $normalize = null, ?float $volume = null, ?float $sentenceSilence = null, ?float $noiseScale = null, ?float $noiseW = null): Audio
     {
-        $response = $this->send(fn () => $this->request()->post('/api/tts', $this->params($text, $voice, $speaker, $speed)));
+        $params = $this->params($text, $voice, $speaker, $speed, compact('normalize', 'volume', 'sentenceSilence', 'noiseScale', 'noiseW'));
+        $response = $this->send(fn () => $this->request()->post('/api/tts', $params));
 
         return new Audio(
             content: $response->body(),
@@ -63,13 +69,16 @@ class TtsClient
     /**
      * Open a stream that delivers the audio one sentence at a time.
      *
+     * Audio options: see synthesize().
+     *
      * @param  'wav'|'pcm'|'ndjson'  $format
      */
-    public function stream(string $text, ?string $voice = null, string|int|null $speaker = null, ?float $speed = null, string $format = 'wav'): AudioStream
+    public function stream(string $text, ?string $voice = null, string|int|null $speaker = null, ?float $speed = null, string $format = 'wav', ?bool $normalize = null, ?float $volume = null, ?float $sentenceSilence = null, ?float $noiseScale = null, ?float $noiseW = null): AudioStream
     {
+        $params = $this->params($text, $voice, $speaker, $speed, compact('normalize', 'volume', 'sentenceSilence', 'noiseScale', 'noiseW')) + ['format' => $format];
         $response = $this->send(fn () => $this->request()
             ->withOptions(['stream' => true])
-            ->post('/api/tts/stream', $this->params($text, $voice, $speaker, $speed) + ['format' => $format]));
+            ->post('/api/tts/stream', $params));
 
         return new AudioStream(
             body: $response->toPsrResponse()->getBody(),
@@ -83,11 +92,13 @@ class TtsClient
      * A URL the browser can load directly (e.g. <audio src>), carrying a
      * temporary token: it works for the token's lifetime (token_ttl).
      *
+     * Audio options: see synthesize().
+     *
      * @param  'wav'|'pcm'|'ndjson'  $format  only used with $stream
      */
-    public function url(string $text, ?string $voice = null, string|int|null $speaker = null, ?float $speed = null, bool $stream = true, string $format = 'wav'): string
+    public function url(string $text, ?string $voice = null, string|int|null $speaker = null, ?float $speed = null, bool $stream = true, string $format = 'wav', ?bool $normalize = null, ?float $volume = null, ?float $sentenceSilence = null, ?float $noiseScale = null, ?float $noiseW = null): string
     {
-        $params = $this->params($text, $voice, $speaker, $speed) + ($stream && $format !== 'wav' ? ['format' => $format] : []);
+        $params = $this->params($text, $voice, $speaker, $speed, compact('normalize', 'volume', 'sentenceSilence', 'noiseScale', 'noiseW')) + ($stream && $format !== 'wav' ? ['format' => $format] : []);
 
         return $this->baseUrl().($stream ? '/api/tts/stream' : '/api/tts').'?'.http_build_query($params + ['token' => $this->token()]);
     }
@@ -144,15 +155,26 @@ class TtsClient
     }
 
     /**
+     * Request parameters; nulls fall back to config('tts.*') and are left
+     * out when that is unset too, so the server's defaults apply.
+     *
+     * @param  array{normalize: ?bool, volume: ?float, sentenceSilence: ?float, noiseScale: ?float, noiseW: ?float}  $audio
      * @return array<string, string|int|float>
      */
-    private function params(string $text, ?string $voice, string|int|null $speaker, ?float $speed): array
+    private function params(string $text, ?string $voice, string|int|null $speaker, ?float $speed, array $audio): array
     {
+        $normalize = $audio['normalize'] ?? $this->config['normalize'] ?? null;
+
         return array_filter([
             'text' => $text,
             'voice' => $voice ?? $this->config['voice'] ?? null,
             'speaker' => $speaker,
             'speed' => $speed,
+            'normalize' => $normalize === null ? null : (int) (bool) $normalize,
+            'volume' => $audio['volume'] ?? $this->config['volume'] ?? null,
+            'sentence_silence' => $audio['sentenceSilence'] ?? $this->config['sentence_silence'] ?? null,
+            'noise_scale' => $audio['noiseScale'] ?? $this->config['noise_scale'] ?? null,
+            'noise_w' => $audio['noiseW'] ?? $this->config['noise_w'] ?? null,
         ], fn ($value) => $value !== null && $value !== '');
     }
 

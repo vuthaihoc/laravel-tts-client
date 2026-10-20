@@ -19,6 +19,14 @@ return [
     // Voice used when none is given; null lets the server pick its default.
     'voice' => env('TTS_VOICE'),
 
+    // Audio defaults for every call; null = let the server decide
+    // (normalize on, volume 1, 0.2 s between sentences, the voice's noise).
+    'normalize' => env('TTS_NORMALIZE') === null ? null : filter_var(env('TTS_NORMALIZE'), FILTER_VALIDATE_BOOL),
+    'volume' => is_numeric(env('TTS_VOLUME')) ? (float) env('TTS_VOLUME') : null,
+    'sentence_silence' => is_numeric(env('TTS_SENTENCE_SILENCE')) ? (float) env('TTS_SENTENCE_SILENCE') : null,
+    'noise_scale' => is_numeric(env('TTS_NOISE_SCALE')) ? (float) env('TTS_NOISE_SCALE') : null,
+    'noise_w' => is_numeric(env('TTS_NOISE_W')) ? (float) env('TTS_NOISE_W') : null,
+
     // Seconds; long texts can take a while to synthesize.
     'timeout' => (int) env('TTS_TIMEOUT', 120),
 

@@ -59,6 +59,49 @@ class TtsClientTest extends TestCase
         Http::assertSent(fn (Request $request) => $request->data() === ['text' => 'Hello', 'voice' => 'en_GB-alan-medium']);
     }
 
+    public function test_sends_audio_options_including_zero_values(): void
+    {
+        Http::fake(['*' => Http::response('RIFF')]);
+
+        Tts::synthesize('Hello', normalize: false, volume: 0.8, sentenceSilence: 0.5, noiseScale: 0.0, noiseW: 0.3);
+
+        Http::assertSent(fn (Request $request) => $request->data() === [
+            'text' => 'Hello',
+            'normalize' => 0,
+            'volume' => 0.8,
+            'sentence_silence' => 0.5,
+            'noise_scale' => 0.0,
+            'noise_w' => 0.3,
+        ]);
+    }
+
+    public function test_audio_options_fall_back_to_config(): void
+    {
+        config(['tts.normalize' => true, 'tts.sentence_silence' => 0.0, 'tts.noise_w' => 0.4]);
+        Http::fake(['*' => Http::response('RIFF')]);
+
+        Tts::synthesize('Hello', noiseW: 0.1);
+
+        Http::assertSent(fn (Request $request) => $request->data() === [
+            'text' => 'Hello',
+            'normalize' => 1,
+            'sentence_silence' => 0.0,
+            'noise_w' => 0.1,
+        ]);
+    }
+
+    public function test_stream_and_url_carry_audio_options(): void
+    {
+        Http::fake(['*' => Http::response('RIFF')]);
+
+        Tts::stream('Hello', format: 'pcm', volume: 0.5, noiseScale: 0.2);
+        Http::assertSent(fn (Request $request) => $request['format'] === 'pcm' && $request['volume'] === 0.5 && $request['noise_scale'] === 0.2);
+
+        parse_str(parse_url(Tts::url('Hello', normalize: false, sentenceSilence: 1.0), PHP_URL_QUERY), $query);
+        $this->assertSame('0', $query['normalize']);
+        $this->assertSame('1', $query['sentence_silence']);
+    }
+
     public function test_maps_error_responses_to_exceptions(): void
     {
         $cases = [

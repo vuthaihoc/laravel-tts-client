@@ -45,6 +45,36 @@ $audio->save('tts/hello.wav', 's3');
 Route::get('/hello.wav', fn () => Tts::synthesize('Xin chào!'));
 ```
 
+### Tuỳ chỉnh âm thanh
+
+`synthesize()`, `stream()` và `url()` nhận thêm các named argument sau. Để `null` (mặc định) thì lấy giá trị trong config; config cũng không đặt thì server dùng mặc định của nó:
+
+| Tham số | Server mặc định | Ý nghĩa |
+|---|---|---|
+| `normalize` | `true` | Đưa đỉnh của mỗi câu về mức tối đa rồi mới nhân `volume` |
+| `volume` | `1.0` | `0.1`–`2` |
+| `sentenceSilence` | `0.2` | Giây lặng giữa các câu (`0`–`3`) |
+| `noiseScale` | theo voice (~`0.667`) | Độ biến thiên của giọng; thấp hơn thì đều hơn nhưng phẳng hơn |
+| `noiseW` | theo voice (~`0.8`) | Độ biến thiên nhịp; `noiseScale: 0, noiseW: 0` cho kết quả lặp lại y hệt |
+
+```php
+Tts::synthesize('Xin chào!', volume: 0.8, sentenceSilence: 0.4);
+Tts::stream($text, format: 'pcm', noiseScale: 0.5, noiseW: 0.6);
+```
+
+Đặt mặc định cho cả app trong `.env`: `TTS_NORMALIZE`, `TTS_VOLUME`, `TTS_SENTENCE_SILENCE`, `TTS_NOISE_SCALE`, `TTS_NOISE_W`.
+
+### IPA
+
+Phần nằm giữa `[[ ... ]]` được đọc đúng theo âm vị IPA, dùng để sửa cách đọc tên riêng, từ viết tắt, hoặc chọn cách đọc Anh-Anh hay Anh-Mỹ cho một từ:
+
+```php
+Tts::synthesize('I like [[təmˈɑːtəʊ]] sauce.', voice: 'en_US-amy-medium');
+Tts::synthesize('Chào mừng quý khách đến [[tˈe-2ɲ fˈoɜ]] Hồ Chí Minh.');
+```
+
+Ký hiệu phải theo đúng quy ước của espeak-ng cho voice đó. Lấy IPA mẫu trên server bằng `php artisan piper:ipa "thành phố" --voice=...`. Cần server có libpiper build từ `scripts/build-libpiper.sh` (image Docker đã có sẵn), xem [docs của server](https://vuthaihoc.github.io/laravel-tts-api/api/#nhập-ipa).
+
 ### Stream
 
 ```php

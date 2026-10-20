@@ -57,6 +57,34 @@ class LiveServerTest extends TestCase
         $this->assertStringStartsWith('RIFF', $body);
     }
 
+    private function peak(string $wav): int
+    {
+        $samples = unpack('s*', substr($wav, 44));
+
+        return max(max($samples), -min($samples));
+    }
+
+    public function test_audio_options_change_the_audio(): void
+    {
+        $text = 'Hôm nay trời rất đẹp.';
+
+        $this->assertGreaterThan(32000, $this->peak(Tts::synthesize($text, normalize: true)->content));
+        $this->assertLessThan(24000, $this->peak(Tts::synthesize($text, normalize: false)->content));
+
+        // No sampling noise: the same request gives the same audio.
+        $quiet = fn () => Tts::synthesize('Same text.', voice: 'en_US-amy-medium', noiseScale: 0, noiseW: 0)->content;
+        $this->assertSame($quiet(), $quiet());
+    }
+
+    public function test_ipa_blocks(): void
+    {
+        $words = Tts::synthesize('I like tomato sauce.', voice: 'en_US-amy-medium', noiseW: 0)->duration;
+        $ipa = Tts::synthesize('I like [[təmˈeɪɾoʊ]] sauce.', voice: 'en_US-amy-medium', noiseW: 0)->duration;
+
+        // A server without IPA support spells the symbols out, several times longer.
+        $this->assertEqualsWithDelta(1.0, $ipa / $words, 0.4);
+    }
+
     public function test_server_errors_map_to_exceptions(): void
     {
         try {
